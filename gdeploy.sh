@@ -1,9 +1,10 @@
 #!/bin/bash
+# progrqm by: Peter Forret <peter@forret.com>
 PROGNAME=$(basename $0)
 
 if [[ "$1" == "" ]] ; then
 	#usage
-	echo "$PROGNAME [init|push|login]"
+	echo "$PROGNAME [init|commit|push|deploy|all|login|domains]"
 	echo "   init: initialize the Gandi Paas settings"
 	echo "   push: commit, push and deploy this website"
 	echo "   login: do ssh login to the Gandi host for this website"
@@ -29,7 +30,8 @@ if [[ "$1" == "init" ]] ; then
 	if [[ "$DOMAIN" =~ "." ]] ; then
 		#contains . - could be domain name
 		echo "domain : $DOMAIN" > $DOMINFO
-		gandi vhost info $DOMAIN >> $DOMINFO
+		gandi vhost info $DOMAIN >>	$DOMINFO
+		git remote add gandi git+ssh://$USERNAME@$GITHOST/$DOMAIN.git
 	else
 		echo "[$DOMAIN] doesn't look like a valid domain name - we need something like www.example.com" 
 		exit 1
@@ -64,23 +66,47 @@ USERNAME=$(echo $SSHLOGIN | cut -d@ -f1)
 SSHHOST=$(echo $SSHLOGIN | cut -d@ -f2)
 echo "#USER: $USERNAME"
 
+case "$1" in
+	commit|1)
+		echo "## git commit (local)"
+		git commit -a
+		;;
 
-if [[ "$1" == "push" ]] ; then
-	git commit -a \
-	&& git push gandi \
-	&& ssh $USERNAME@$GITHOST deploy $DOMAIN.git
-fi
+	push|2)
+		echo "## git push -> $GITHOST"
+		git push gandi master
+		;;
 
-if [[ "$1" == "domains" ]] ; then
-	gandi paas list \
-	| grep vhost \
-	| cut -d: -f2 \
-	| sed 's/ //g' \
-	| sort
-fi
+	deploy|3)
+		echo "## git deploy -> $FTPHOST"
+		ssh $USERNAME@$GITHOST deploy $DOMAIN.git
+		;;
 
-if [[ "$1" == "login" ]] ; then
-	gandi paas info $WEBHOST | grep console
-	gandi paas console $WEBHOST
-fi
+	full|all)
+		git commit -a \
+		&& git push gandi master \
+		&& ssh $USERNAME@$GITHOST deploy $DOMAIN.git
+		;;
 
+	login)
+		echo "## login as $USERNAME"
+		echo "## get your password from your password manager!"
+		gandi paas console $WEBHOST
+		;;
+
+	domains)
+		gandi paas list \
+		| grep vhost \
+		| cut -d: -f2 \
+		| sed 's/ //g' \
+		| sort
+		;;
+
+	check)
+		echo "============="
+		echo "## git status"
+		git status
+		echo "## git remote"
+		git remote -v show
+
+esac
