@@ -4,10 +4,15 @@ PROGNAME=$(basename $0)
 
 if [[ "$1" == "" ]] ; then
 	#usage
-	echo "$PROGNAME [init|commit|push|deploy|all|login|domains]"
+	echo "$PROGNAME [init|commit|push|deploy|all|login|serve|domains]"
+	echo "   domains: get all hosted Gandi sites"
 	echo "   init: initialize the Gandi Paas settings"
-	echo "   push: commit, push and deploy this website"
+	echo "   all: commit, push and deploy this website"
+	echo "   commit: git commit all local changes"
+	echo "   push: git push to Gandi git server"
+	echo "   deploy: ssh deploy from git to live website"
 	echo "   login: do ssh login to the Gandi host for this website"
+	echo "   serve: do ssh login to the Gandi host for this website"
 	exit 0
 fi
 
@@ -92,6 +97,20 @@ case "$1" in
 		echo "## login as $USERNAME"
 		echo "## get your password from your password manager!"
 		gandi paas console $WEBHOST
+		;;
+
+	serve|8000|http)
+		PORT=8000
+		echo "## served as http://localhost:$PORT!"
+		php -S localhost:$PORT -t htdocs/
+		;;
+
+	serve2|random|rnd)
+		PORT=$(( 8000 + $RANDOM % 100 ))
+		echo "## served as http://localhost:$PORT!"
+		## following only works on MacOS
+		bash -c "sleep 1; open http://localhost:$PORT/"
+		php -S localhost:$PORT -t htdocs/
 		;;
 
 	domains)
