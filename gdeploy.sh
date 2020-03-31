@@ -1,5 +1,6 @@
 #!/bin/bash
-# progrqm by: Peter Forret <peter@forret.com>
+# https://github.com/pforret/gandi_deploy
+# program by: Peter Forret <peter@forret.com>
 PROGNAME=$(basename $0)
 
 if [[ "$1" == "" ]] ; then
@@ -37,6 +38,7 @@ if [[ "$1" == "init" ]] ; then
 		echo "domain : $DOMAIN" > $DOMINFO
 		gandi vhost info $DOMAIN >>	$DOMINFO
 		git remote add gandi git+ssh://$USERNAME@$GITHOST/$DOMAIN.git
+		echo $PROGNAME >> .gitignore
 	else
 		echo "[$DOMAIN] doesn't look like a valid domain name - we need something like www.example.com" 
 		exit 1
