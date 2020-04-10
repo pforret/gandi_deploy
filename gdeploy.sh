@@ -3,9 +3,13 @@
 # program by: Peter Forret <peter@forret.com>
 PROGNAME=$(basename $0)
 PREFIX=$(basename $0 .sh)
-
+PROGVERSION="1.1"
+PROGAUTHOR="Peter Forret <peter@forret.com>"
 if [[ "$1" == "" ]] ; then
 	#usage
+	echo "#	$PROGNAME $PROGVERSION"
+	echo "#	author: $PROGAUTHOR"
+	echo "#	link: https://github.com/pforret/gandi_deploy"
 	echo "$PROGNAME [init|commit|push|deploy|all|login|serve|domains]"
 	echo "   init: initialize the Gandi Paas settings"
 	echo " "
@@ -19,7 +23,6 @@ if [[ "$1" == "" ]] ; then
 	echo "   rnd: run local devl website on random port localhost:8000-8099"
 	echo " "
 	echo "   domains: get all hosted Gandi sites"
-	echo "   remotes: get all git remotes"
 	exit 0
 fi
 
