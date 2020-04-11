@@ -120,16 +120,22 @@ get_remote_info(){
 			echo "generated : $(date)" >> $INFO_REMOTE
 			echo "git : $GIT_URL" >> $INFO_REMOTE
 			DOMAIN=$(basename $GIT_URL .git)
-			echo "domain : $DOMAIN" >> $INFO_REMOTE
-			IPADR=$(nslookup $DOMAIN 8.8.8.8 | grep -v 8.8.8.8 | grep Address | cut -d: -f2 | sed 's/ //g')
-			if [[ -n "$IPADR" ]] ; then
-				echo "IP : $IPADR" >> $INFO_REMOTE
-				REVERSE=$(nslookup $IPADR 8.8.8.8 | grep -v 8.8.8.8 | grep name | cut -d= -f2 | sed 's/ //g')
-				echo "reverse : $REVERSE" >> $INFO_REMOTE
+			if [[ $DOMAIN == *"."* ]] ; then
+				# probably a domain
+				echo "domain : $DOMAIN" >> $INFO_REMOTE
+				IPADR=$(nslookup $DOMAIN 8.8.8.8 | grep -v 8.8.8.8 | grep Address | cut -d: -f2 | sed 's/ //g')
+				if [[ -n "$IPADR" ]] ; then
+					echo "IP : $IPADR" >> $INFO_REMOTE
+					REVERSE=$(nslookup $IPADR 8.8.8.8 | grep -v 8.8.8.8 | grep name | cut -d= -f2 | sed 's/ //g')
+					echo "reverse : $REVERSE" >> $INFO_REMOTE
+				else
+					echo "no IP/nslookup info"
+				fi
+				gandi vhost info $DOMAIN >> $INFO_REMOTE
 			else
-				echo "no IP/nslookup info"
+				# not a domain
+				echo "[$DOMAIN] is not a domain"
 			fi
-			gandi vhost info $DOMAIN >> $INFO_REMOTE
 		else
 			echo "Current remotes = " $(list_remotes)
 			die "remote [$REMOTE] not found" 
@@ -150,6 +156,8 @@ if [[ -z "$2" ]] ; then
 else
 	REMOTE=$2
 fi
+
+## INITIALIZE ALL THE DATA
 
 if [[ "$1" == "init" ]] ; then
 	echo "## $PROGNAME init"
