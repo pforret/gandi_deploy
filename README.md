@@ -32,26 +32,26 @@ script to work easily with gandi.net paas git deployment (bash)
 
 ## Usage 
 
-```
-  **gdeploy.sh** [init|commit|push|deploy|all|login|serve|domains]
 
-  *init* : initialize the Gandi Paas settings
+gdeploy.sh [init|commit|push|deploy|all|login|serve|domains]
 
-  *all [remote]* : commit, push and deploy this website
+* **init** : initialize the Gandi Paas settings
 
-  *commit* : git commit all local changes
+* all [remote] : commit, push and deploy this website
 
-  *push [remote]* : git push to Gandi git server
+* commit : git commit all local changes
 
-  deploy [remote]: ssh deploy from git to live website
+* push [remote] : git push to Gandi git server
 
-  login: do ssh login to the Gandi host for this website
+* deploy [remote]: ssh deploy from git to live website
 
-  serve: run local devl website on localhost:8000
+* login: do ssh login to the Gandi host for this website
 
-  rnd: run local devl website on random port localhost:8000-8099
+* serve: run local devl website on localhost:8000
 
-  domains: get all hosted Gandi sites
-```
+* rnd: run local devl website on random port localhost:8000-8099
+
+* domains: get all hosted Gandi sites
+
 
 [Gandi CLI]: https://cli.gandi.net/
