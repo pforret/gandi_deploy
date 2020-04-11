@@ -34,15 +34,31 @@ if [[ -z $(which gandi) ]] ; then
 	exit 0
 fi
 
+die(){
+	echo "! $*"
+	exit 1
+}
+
 # all files created go in a special folder
 GTEMP=.gandi
 if [[ ! -d $GTEMP ]] ;  then
 	mkdir $GTEMP
+	if [[ ! -d $GTEMP ]] ; then
+		die "Cannot create folder [$GTEMP] - probably no write permissions"
+	fi
 fi
 
-die(){
-	echo "! $*"
-	exit 1
+get_value(){
+	local key=$1
+	local default=$2
+	local value=$(egrep "^$key" \
+	| cut -d: -f2 \
+	| sed 's/ //g')
+	if [[ -z "$value" ]] ; then
+		echo $default
+	else
+		echo $value
+	fi
 }
 
 LIST_SERVERS=$GTEMP/list.servers.txt
@@ -59,6 +75,29 @@ list_servers(){
 		| tee $LIST_SERVERS
 	fi
 
+}
+
+show_progress(){
+	total_lines=$1
+	update_lines=$(($total_lines / 500))
+	lineno=0
+	fullbar="================================================================================"
+	barlength=${#fullbar}
+	while read -r line; do 
+		lineno=$(($lineno + 1))
+		# for long log files, just update every $update_lines lines
+		[[ $total_lines -gt 500 ]] && [[ $(($lineno % $update_lines)) -ne 1 ]] && continue
+		percent=$(( 100 * $lineno / $total_lines))
+		width=$(( $barlength * $lineno / $total_lines))
+		if [[ $width -gt $barlength ]] ; then
+			width=$barlength
+		fi
+		if [[ $width -lt 1 ]] ; then
+			width=1
+		fi
+		barpart=$(echo $fullbar | cut -c1-$width)
+		printf "[%${width}s] $percent%%\r" $barpart
+	done
 }
 
 get_server_info(){
@@ -143,13 +182,6 @@ get_remote_info(){
 	fi
 }
 
-get_value(){
-	key=$1
-	egrep "^$key" \
-	| cut -d: -f2 \
-	| sed 's/ //g'
-}
-
 # 2nd param is always  the git remote - default 'gandi'
 if [[ -z "$2" ]] ; then
 	REMOTE=gandi
@@ -194,6 +226,69 @@ USERNAME=$(echo $SSHLOGIN | cut -d@ -f1)
 SSHHOST=$(echo $SSHLOGIN | cut -d@ -f2)
 #echo "#USER: $USERNAME"
 
+
+git_deploy(){
+	local FLOG=$GTEMP/$DOMAIN.deploy.log
+	local FTOT=$GTEMP/$DOMAIN.deploy.info.txt
+	local TSTART=$(date '+%s')
+	echo ... LOG in [$FLOG]
+	if [[ ! -s $FTOT ]] ; then
+		# estimate by counting # files
+		local TOTAL_LINES=$(find . -type f | wc -l | sed 's/ //g')
+	else
+		# estimate by taking last count
+		local TOTAL_LINES=$(cat $FTOT | get_value lines 1)
+		if [[ $TOTAL_LINES -lt 10 ]] ; then
+			local TOTAL_LINES=$(find . -type f | wc -l | sed 's/ //g')
+		fi
+	fi
+	local ESTIM_SECS=$(cat $FTOT | get_value secs $((TOTAL_LINES / 100)) )
+	local ESTIM_MINS=$(($ESTIM_SECS / 60))
+	echo ... Estimated time: $ESTIM_SECS secs - $ESTIM_MINS min
+	ssh $USERNAME@$GITHOST deploy $DOMAIN.git 2>&1 \
+	| tee $FLOG \
+	| show_progress $TOTAL_LINES
+	printf "\n"
+
+	local TSTOP=$(date '+%s')
+	local NBLINES=$(< $FLOG wc -l | sed 's/ //g')
+	local NBSECS=$(( $TSTOP - $TSTART)) 
+	echo "lines : $NBLINES" > $FTOT
+	echo "secs : $NBSECS"	>> $FTOT
+	local LPS=$(($NBLINES / $NBSECS))
+	echo $NBLINES lines in $NBSECS seconds - $LPS lines/second 
+	echo -------------------------------
+	tail -4 $FLOG
+	echo -------------------------------
+}
+
+git_push(){
+	local FLOG=$GTEMP/$DOMAIN.push.log
+	local FTOT=$GTEMP/$DOMAIN.push.info.txt
+	local TSTART=$(date '+%s')
+	echo ... LOG in [$FLOG]
+	local TOTAL_LINES=$(git status | wc -l | sed 's/ //g')
+	local ESTIM_SECS=$((TOTAL_LINES / 2))
+	echo ... Estimated time: $ESTIM_SECS secs
+	git push $REMOTE master 2>&1 \
+	| tee $FLOG \
+	| show_progress $TOTAL_LINES
+	printf "\n"
+
+	local TSTOP=$(date '+%s')
+	local NBLINES=$(< $FLOG wc -l | sed 's/ //g')
+	local NBSECS=$(( $TSTOP - $TSTART)) 
+	local LPS=$(($NBLINES / $NBSECS))
+	echo "lines : $NBLINES" > $FTOT
+	echo "secs : $NBSECS"	>> $FTOT
+	echo "lines/sec : $LPS"	>> $FTOT
+	echo $NBLINES lines in $NBSECS seconds - $LPS lines/second 
+	echo -------------------------------
+	tail -4 $FLOG
+	echo -------------------------------
+
+}
+
 case "$1" in
 	commit|1)
 		echo "## git commit (local)"
@@ -202,19 +297,19 @@ case "$1" in
 
 	push|2)
 		echo "## git push -> $GITHOST ($REMOTE)"
-		git push $REMOTE master
+		git_push
 		;;
 
 	deploy|3)
 		echo "## git deploy -> $FTPHOST ($DOMAIN)"
-		ssh $USERNAME@$GITHOST deploy $DOMAIN.git
-		echo Check http://$deploydomain/
+		git_deploy
+		echo Check http://$DOMAIN/
 		;;
 
 	full|all)
 		git commit -a \
-		&& git push $REMOTE master \
-		&& ssh $USERNAME@$GITHOST deploy $DOMAIN.git
+		&& git_push \
+		&& git_deploy
 		echo Check http://$DOMAIN/
 		;;
 
