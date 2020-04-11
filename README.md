@@ -35,9 +35,7 @@ script to work easily with gandi.net paas git deployment (bash)
 
 gdeploy.sh [init|commit|push|deploy|all|login|serve|domains]
 
-* **init** : initialize the Gandi Paas settings - will get all server/domain/git/remote info for use with the other commands - to update it, just run it again
-
-    deployment
+* **init** : will get all server/domain/git/remote info for use with the other commands - to update it, just run it again
 
 * **commit** : git commit all local changes
 
