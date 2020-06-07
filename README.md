@@ -1,6 +1,7 @@
 # gandi_deploy
 
-script to work easily with gandi.net paas git deployment (bash)
+* script to work easily with gandi.net paas git deployment (bash)
+* based on Bash Boilerplate https://github.com/pforret/bash-boilerplate
 
 ## Installation
 
