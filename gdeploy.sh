@@ -3,26 +3,24 @@
 # program by: Peter Forret <peter@forret.com>
 PROGNAME=$(basename $0)
 PREFIX=$(basename $0 .sh)
-PROGVERSION="1.1"
+PROGVERSION="1.2"
 PROGAUTHOR="Peter Forret <peter@forret.com>"
 if [[ "$1" == "" ]] ; then
 	#usage
-	echo "#	$PROGNAME $PROGVERSION"
-	echo "#	author: $PROGAUTHOR"
-	echo "#	link: https://github.com/pforret/gandi_deploy"
-	echo "$PROGNAME [init|commit|push|deploy|all|login|serve|domains]"
-	echo "   init: initialize the Gandi Paas settings"
-	echo " "
-	echo "   all [renote]: commit, push and deploy this website"
-	echo "   commit: git commit all local changes"
-	echo "   push [remote]: git push to Gandi git server"
-	echo "   deploy [remote|domain]: ssh deploy from git to live website"
-	echo "   login: do ssh login to the Gandi host for this website"
-	echo " "
-	echo "   serve: run local devl website on localhost:8000"
-	echo "   rnd: run local devl website on random port localhost:8000-8099"
-	echo " "
-	echo "   domains: get all hosted Gandi sites"
+	echo "# $PROGNAME $PROGVERSION"
+	echo "# author: $PROGAUTHOR"
+	echo "# website: https://github.com/pforret/gandi_deploy"
+	echo "> usage: $PROGNAME [init|commit|push|deploy|all|login|serve|domains] (target)"
+	echo "  init: initialize the Gandi Paas settings"
+	echo "  all [renote]: commit, push and deploy this website"
+	echo "  commit: git commit all local changes"
+	echo "  push [remote]: git push to Gandi git server"
+	echo "  deploy [remote|domain]: ssh deploy from git to live website"
+	echo "  login: do ssh login to the Gandi host for this website"
+	echo "  serve: run local devl website on localhost:8000"
+	echo "  rnd: run local devl website on random port localhost:8000-8099"
+	echo "  consoles: get 'gandi paas console ...' command for every domain"
+	echo "  domains: get all hosted Gandi sites"
 	exit 0
 fi
 
@@ -52,13 +50,29 @@ get_value(){
 	local key=$1
 	local default=$2
 	local value=$(egrep "^$key" \
-	| cut -d: -f2 \
-	| sed 's/ //g')
+					| cut -d: -f2 \
+					| sed 's/ //g')
 	if [[ -z "$value" ]] ; then
 		echo $default
 	else
 		echo $value
 	fi
+}
+
+get_value_from_file(){
+	#local file=$1
+	#local key=$2
+	#local def=$3
+	if [[ -f "$1" ]] ; then
+		found=$(< "$1" awk -F: -v key="$2" '$1 == key {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
+		if [[ -z "$found" ]] ; then
+			echo $3
+		else
+			echo $found
+		fi
+	else 
+		echo $3
+	fi 
 }
 
 LIST_SERVERS=$GTEMP/list.servers.txt
@@ -98,6 +112,52 @@ show_progress(){
 		barpart=$(echo $fullbar | cut -c1-$width)
 		printf "[%${width}s] $percent%%\r" $barpart
 	done
+}
+
+show_progress2(){
+	local counter_id=$1
+	local fallback=$2
+	local FLOG=$GTEMP/$counter_id.deploy.log
+	local FTOT=$GTEMP/$counter_id.deploy.txt
+
+	local total_lines=$(get_value_from_file $FTOT lines $fallback)
+	local total_seconds=$(get_value_from_file $FTOT secs $fallback)
+	echo "$counter_id: $total_seconds seconds (estimated)"
+	local update_every=$(($total_lines / 500))
+	[[ update_every -lt 2 ]] && update_every=2
+	local T0=$(date '+%s')
+	  tee $FLOG \
+	| awk -v total_lines=$total_lines -v update_every=$update_every '
+		BEGIN { 
+			fullbar="================================================================================"
+			maxlen=length(fullbar) 
+		} 
+		(NR % update_every) == 1 {
+			#print NR, $0
+			percent=100*NR/total_lines;
+			width=maxlen*NR/total_lines;
+			if(width>maxlen)	width=maxlen
+			if(width<1)			width=1
+			partial=substr(fullbar,1,width)
+			printf("\r[%s] %d%% " , partial , percent)
+			fflush()
+		}
+		END {
+			printf "\n"
+		}
+		'
+	local T1=$(date '+%s')
+	local NBLINES=$(< $FLOG wc -l | sed 's/ //g')
+	local NBSECS=$(( $T1 - $T0)) 
+	local LPS=$(($NBLINES / $NBSECS))
+	echo "lines:$NBLINES" > $FTOT
+	echo "secs:$NBSECS"	>> $FTOT
+	echo "$counter_id: $NBSECS seconds (real)"
+	echo "$counter_id: $NBLINES lines @ $LPS lines/second "
+	echo -------------------------------
+	tail -4 $FLOG
+	echo -------------------------------
+
 }
 
 get_server_info(){
@@ -228,65 +288,15 @@ SSHHOST=$(echo $SSHLOGIN | cut -d@ -f2)
 
 
 git_deploy(){
-	local FLOG=$GTEMP/$DOMAIN.deploy.log
-	local FTOT=$GTEMP/$DOMAIN.deploy.info.txt
-	local TSTART=$(date '+%s')
-	echo ... LOG in [$FLOG]
-	if [[ ! -s $FTOT ]] ; then
-		# estimate by counting # files
-		local TOTAL_LINES=$(find . -type f | wc -l | sed 's/ //g')
-	else
-		# estimate by taking last count
-		local TOTAL_LINES=$(cat $FTOT | get_value lines 1)
-		if [[ $TOTAL_LINES -lt 10 ]] ; then
-			local TOTAL_LINES=$(find . -type f | wc -l | sed 's/ //g')
-		fi
-	fi
-	local ESTIM_SECS=$(cat $FTOT | get_value secs $((TOTAL_LINES / 100)) )
-	local ESTIM_MINS=$(($ESTIM_SECS / 60))
-	echo ... Estimated time: $ESTIM_SECS secs - $ESTIM_MINS min
+	local TOTAL_LINES=$(find . -type f | wc -l | sed 's/ //g')
 	ssh $USERNAME@$GITHOST deploy $DOMAIN.git 2>&1 \
-	| tee $FLOG \
-	| show_progress $TOTAL_LINES
-	printf "\n"
-
-	local TSTOP=$(date '+%s')
-	local NBLINES=$(< $FLOG wc -l | sed 's/ //g')
-	local NBSECS=$(( $TSTOP - $TSTART)) 
-	echo "lines : $NBLINES" > $FTOT
-	echo "secs : $NBSECS"	>> $FTOT
-	local LPS=$(($NBLINES / $NBSECS))
-	echo $NBLINES lines in $NBSECS seconds - $LPS lines/second 
-	echo -------------------------------
-	tail -4 $FLOG
-	echo -------------------------------
+	| show_progress2 git_deploy $TOTAL_LINES
 }
 
 git_push(){
-	local FLOG=$GTEMP/$DOMAIN.push.log
-	local FTOT=$GTEMP/$DOMAIN.push.info.txt
-	local TSTART=$(date '+%s')
-	echo ... LOG in [$FLOG]
 	local TOTAL_LINES=$(git status | wc -l | sed 's/ //g')
-	local ESTIM_SECS=$((TOTAL_LINES / 2))
-	echo ... Estimated time: $ESTIM_SECS secs
-	git push $REMOTE master 2>&1 \
-	| tee $FLOG \
-	| show_progress $TOTAL_LINES
-	printf "\n"
-
-	local TSTOP=$(date '+%s')
-	local NBLINES=$(< $FLOG wc -l | sed 's/ //g')
-	local NBSECS=$(( $TSTOP - $TSTART)) 
-	local LPS=$(($NBLINES / $NBSECS))
-	echo "lines : $NBLINES" > $FTOT
-	echo "secs : $NBSECS"	>> $FTOT
-	echo "lines/sec : $LPS"	>> $FTOT
-	echo $NBLINES lines in $NBSECS seconds - $LPS lines/second 
-	echo -------------------------------
-	tail -4 $FLOG
-	echo -------------------------------
-
+	git push --verbose $REMOTE master 2>&1 \
+	| show_progress2 git_push $TOTAL_LINES
 }
 
 case "$1" in
@@ -326,9 +336,8 @@ case "$1" in
 			php -S localhost:$PORT -t htdocs/
 		else
 			echo "!! there is no htdocs folder!"
-			echo "## (maybe you need to to 'ln -s public htdocs')"
+			echo "## (maybe you need to do 'ln -s public htdocs')"
 		fi
-
 		;;
 
 	serve2|random|rnd)
@@ -336,21 +345,33 @@ case "$1" in
 		if [[ -d htdocs ]] ; then
 			echo "## served as http://localhost:$PORT!"
 			## following only works on MacOS
-			bash -c "sleep 1; open http://localhost:$PORT/"
-			php -S localhost:$PORT -t /htdocs
+			bash -c "sleep 3; open http://localhost:$PORT/"
+			php -S localhost:$PORT -t htdocs/
 		else
 			echo "!! there is no htdocs folder!"
 			echo "## (maybe you need to to 'ln -s public htdocs')"
 		fi
-
 		;;
 
 	domains)
-	for server in $(list_servers force); do
-		echo "# server $server"
-		list_server_domains $server | egrep -v "testmyurl.ws|testing-url.ws" |  awk '{split($0,a,"."); print a[3] a[2] a[1] "     |"  $0}' | sort | cut -d'|' -f2
-		echo " "
-	done
+		for server in $(list_servers force); do
+			echo "# server $server"
+			list_server_domains $server \
+			| egrep -v "testmyurl.ws|testing-url.ws" \
+			| awk '{split($0,a,"."); print a[3] a[2] a[1] "     |"  $0}' \
+			| sort \
+			| cut -d'|' -f2
+			echo " "
+		done
+		;;
+
+	consoles)
+		for server in $(list_servers force); do
+			list_server_domains $server \
+			| egrep -v "testmyurl.ws|testing-url.ws" \
+			| awk -v server=$server '{ printf "%-30s : gandi paas console %s\n", $0, server }'
+		done \
+		| sort
 		;;
 
 	check)
@@ -359,5 +380,13 @@ case "$1" in
 		git status
 		echo "## git remote"
 		git remote -v show
+		;;
+
+	test)
+		ping -c 40 www.google.com | show_progress2 test_ping 29
+		;;
+
+	*)
+		die "Unknown $PROGNAME command [$1]"
 
 esac

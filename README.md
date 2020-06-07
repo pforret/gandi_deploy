@@ -56,5 +56,7 @@ script to work easily with gandi.net paas git deployment (bash)
 
 * **domains** : list all hosted Gandi sites, per Simple Hosting server
 
+* **consoles** : get 'gandi paas console ...' command for every site hosted
+
 
 [Gandi CLI]: https://cli.gandi.net/
