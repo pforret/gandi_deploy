@@ -1,3 +1,7 @@
+![GitHub tag](https://img.shields.io/github/v/tag/pforret/gandi_deploy)
+![Shellcheck CI](https://github.com/pforret/gandi_deploy/workflows/Shellcheck%20CI/badge.svg)
+![Bash CI](https://github.com/pforret/gandi_deploy/workflows/Bash%20CI/badge.svg)
+
 # gandi_deploy
 
 * script to work easily with gandi.net paas git deployment (bash)
