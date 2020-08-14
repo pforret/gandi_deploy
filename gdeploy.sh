@@ -1,33 +1,45 @@
 #!/bin/bash
-# https://github.com/pforret/gandi_deploy
-# program by: Peter Forret <peter@forret.com>
-PROGNAME=$(basename $0)
-PREFIX=$(basename $0 .sh)
-PROGVERSION="1.2"
-PROGAUTHOR="Peter Forret <peter@forret.com>"
+script_fname=$(basename "$0")
+script_author="Peter Forret <peter@forret.com>"
+script_url="https://github.com/pforret/gandi_deploy"
+if [[ -z $(dirname "$0") ]]; then
+  # script called without path ; must be in $PATH somewhere
+  # shellcheck disable=SC2230
+  script_install_path=$(which "$0")
+else
+  # script called with relative/absolute path
+  script_install_path="$0"
+fi
+script_install_path=$(readlink "$script_install_path") # when script was installed with e.g. basher
+script_install_folder=$(dirname "$script_install_path")
+script_version="?.?.?"
+[[ -f "$script_install_folder/VERSION.md" ]] && script_version=$(cat "$script_install_folder/VERSION.md")
+
+
 if [[ "$1" == "" ]] ; then
 	#usage
-	echo "# $PROGNAME $PROGVERSION"
-	echo "# author: $PROGAUTHOR"
-	echo "# website: https://github.com/pforret/gandi_deploy"
-	echo "> usage: $PROGNAME [init|commit|push|deploy|all|login|serve|domains] (target)"
-	echo "  init: initialize the Gandi Paas settings"
-	echo "  all [renote]: commit, push and deploy this website"
-	echo "  commit: git commit all local changes"
+	echo "# $script_fname $script_version"
+	echo "# author: $script_author"
+	echo "# website: $script_url"
+	echo "> usage: $script_fname [init|commit|push|deploy|all|login|serve|domains] (target)"
+	echo "  init     : initialize the Gandi Paas settings"
+	echo "  all [remote]: commit, push and deploy this website"
+	echo "  commit   : git commit all local changes"
 	echo "  push [remote]: git push to Gandi git server"
 	echo "  deploy [remote|domain]: ssh deploy from git to live website"
-	echo "  login: do ssh login to the Gandi host for this website"
-	echo "  serve: run local devl website on localhost:8000"
-	echo "  rnd: run local devl website on random port localhost:8000-8099"
-	echo "  consoles: get 'gandi paas console ...' command for every domain"
-	echo "  domains: get all hosted Gandi sites"
+	echo "  login    : do ssh login to the Gandi host for this website"
+	echo "  serve    : run local devl website on localhost:8000"
+	echo "  rnd      : run local devl website on random port localhost:8000-8099"
+	echo "  consoles : get 'gandi paas console ...' command for every domain"
+	echo "  domains  : get all hosted Gandi sites"
 	exit 0
 fi
 
+# shellcheck disable=SC2230
 if [[ -z $(which gandi) ]] ; then
 	# Gandi CLI not yet installed
-	CURRVERSION=$(curl -s https://raw.githubusercontent.com/Gandi/gandi.cli/master/gandi/cli/__init__.py | grep version | cut -d'=' -f2 | sed "s/'//g")
-	echo "Install Gandi CLI in order to use this script (current version: $CURRVERSION)"
+	gandicli_version=$(curl -s https://raw.githubusercontent.com/Gandi/gandi.cli/master/gandi/cli/__init__.py | grep version | cut -d'=' -f2 | sed "s/'//g")
+	echo "Install Gandi CLI in order to use this script (current version: $gandicli_version)"
 	echo "https://github.com/gandi/gandi.cli#installation"
 	exit 0
 fi
@@ -38,24 +50,25 @@ die(){
 }
 
 # all files created go in a special folder
-GTEMP=.gandi
-if [[ ! -d $GTEMP ]] ;  then
-	mkdir $GTEMP
-	if [[ ! -d $GTEMP ]] ; then
-		die "Cannot create folder [$GTEMP] - probably no write permissions"
+cache_folder=.gandi
+if [[ ! -d $cache_folder ]] ;  then
+	mkdir $cache_folder
+	if [[ ! -d $cache_folder ]] ; then
+		die "Cannot create folder [$cache_folder] - probably no write permissions"
 	fi
 fi
 
 get_value(){
 	local key=$1
 	local default=$2
-	local value=$(egrep "^$key" \
+	local value
+	value=$(grep -E "^$key" \
 					| cut -d: -f2 \
 					| sed 's/ //g')
 	if [[ -z "$value" ]] ; then
-		echo $default
+		echo "$default"
 	else
-		echo $value
+		echo "$value"
 	fi
 }
 
@@ -66,23 +79,23 @@ get_value_from_file(){
 	if [[ -f "$1" ]] ; then
 		found=$(< "$1" awk -F: -v key="$2" '$1 == key {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
 		if [[ -z "$found" ]] ; then
-			echo $3
+			echo "$3"
 		else
-			echo $found
+			echo "$found"
 		fi
 	else 
-		echo $3
+		echo "$3"
 	fi 
 }
 
-LIST_SERVERS=$GTEMP/list.servers.txt
+LIST_SERVERS=$cache_folder/list.servers.txt
 list_servers(){
 	if [[ -z "$1" ]] && [[ -s "$LIST_SERVERS" ]] ; then
 		# cache exists and no forced update
 		cat $LIST_SERVERS
 	else
 		  gandi paas list \
-		| egrep "^name" \
+		| grep -E "^name" \
 		| cut -d ':' -f2 \
 		| sed 's/ //g' \
 		| sort \
@@ -92,42 +105,27 @@ list_servers(){
 }
 
 show_progress(){
-	total_lines=$1
-	update_lines=$(($total_lines / 500))
-	lineno=0
-	fullbar="================================================================================"
-	barlength=${#fullbar}
-	while read -r line; do 
-		lineno=$(($lineno + 1))
-		# for long log files, just update every $update_lines lines
-		[[ $total_lines -gt 500 ]] && [[ $(($lineno % $update_lines)) -ne 1 ]] && continue
-		percent=$(( 100 * $lineno / $total_lines))
-		width=$(( $barlength * $lineno / $total_lines))
-		if [[ $width -gt $barlength ]] ; then
-			width=$barlength
-		fi
-		if [[ $width -lt 1 ]] ; then
-			width=1
-		fi
-		barpart=$(echo $fullbar | cut -c1-$width)
-		printf "[%${width}s] $percent%%\r" $barpart
-	done
-}
-
-show_progress2(){
 	local counter_id=$1
 	local fallback=$2
-	local FLOG=$GTEMP/$counter_id.deploy.log
-	local FTOT=$GTEMP/$counter_id.deploy.txt
+	local file_output="$cache_folder/$counter_id.deploy.log"
+	local file_stats="$cache_folder/$counter_id.deploy.txt"
+	local lines_output
+	local lines_per_second
+	local time_finished
+	local time_passed
+	local time_started
+	local total_lines
+	local total_seconds
+	local update_every
 
-	local total_lines=$(get_value_from_file $FTOT lines $fallback)
-	local total_seconds=$(get_value_from_file $FTOT secs $fallback)
+	total_lines=$(get_value_from_file "$file_stats" lines "$fallback")
+	total_seconds=$(get_value_from_file "$file_stats" secs "$fallback")
 	echo "$counter_id: $total_seconds seconds (estimated)"
-	local update_every=$(($total_lines / 500))
+	update_every=$((total_lines / 500))
 	[[ update_every -lt 2 ]] && update_every=2
-	local T0=$(date '+%s')
-	  tee $FLOG \
-	| awk -v total_lines=$total_lines -v update_every=$update_every '
+	time_started=$(date '+%s')
+	  tee "$file_output" \
+	| awk -v total_lines="$total_lines" -v update_every="$update_every" '
 		BEGIN { 
 			fullbar="================================================================================"
 			maxlen=length(fullbar) 
@@ -146,58 +144,58 @@ show_progress2(){
 			printf "\n"
 		}
 		'
-	local T1=$(date '+%s')
-	local NBLINES=$(< $FLOG wc -l | sed 's/ //g')
-	local NBSECS=$(( $T1 - $T0)) 
-	local LPS=$(($NBLINES / $NBSECS))
-	echo "lines:$NBLINES" > $FTOT
-	echo "secs:$NBSECS"	>> $FTOT
-	echo "$counter_id: $NBSECS seconds (real)"
-	echo "$counter_id: $NBLINES lines @ $LPS lines/second "
+	time_finished=$(date '+%s')
+	lines_output=$(< "$file_output" wc -l | sed 's/ //g')
+	time_passed=$(( time_finished - time_started))
+	lines_per_second=$((lines_output / time_passed))
+	echo "lines:$lines_output" > "$file_stats"
+	echo "secs:$time_passed"	>> "$file_stats"
+	echo "$counter_id: $time_passed seconds (real)"
+	echo "$counter_id: $lines_output lines @ $lines_per_second lines/second "
 	echo -------------------------------
-	tail -4 $FLOG
+	tail -4 "$file_output"
 	echo -------------------------------
 
 }
 
-get_server_info(){
+get_cache_server(){
 	server=$1
-	SERVER_INFO=$GTEMP/server.$server.info.txt
-	if [[ -z "$2" ]] && [[ -s "$SERVER_INFO" ]] ; then
+	local cache_server="$cache_folder/server.$server.info.txt"
+	if [[ -z "$2" ]] && [[ -s "$cache_server" ]] ; then
 		# cache exists and no forced update
-		cat $SERVER_INFO
+		cat "$cache_server"
 	else
-		  gandi paas info $server \
-		| tee $SERVER_INFO
+		  gandi paas info "$server" \
+		| tee "$cache_server"
 	fi
 }
 
-list_server_domains(){
+cache_domains(){
 	server=$1
-	LIST_SERVER_DOMAINS=$GTEMP/server.$server.domains.txt
-	if [[ -z "$2" ]] && [[ -s "$LIST_SERVER_DOMAINS" ]] ; then
+	local cache_domains="$cache_folder/server.$server.domains.txt"
+	if [[ -z "$2" ]] && [[ -s "$cache_domains" ]] ; then
 		# cache exists and no forced update
-		cat $LIST_SERVER_DOMAINS
+		cat "$cache_domains"
 	else
-		  get_server_info $server \
+		  get_cache_server "$server" \
 		| grep vhost \
 		| cut -d: -f2 \
 		| sed 's/ //g' \
 		| sort \
-		| tee $LIST_SERVER_DOMAINS
+		| tee "$cache_domains"
 	fi
 }
 
 list_remotes(){
-	# no need to cahe, very fast
+	# no need to cache, very fast
 	  git remote -v \
 	| awk '/(fetch)/ {print $1,$2}'
 }
 
 add_to_ignore(){
 	path=$1
-	if [[ -z $(grep $path .gitignore) ]] ; then
-		echo $path >> .gitignore
+	if ! grep -q "$path" .gitignore ; then
+		echo "$path" >> .gitignore
 	fi
 }
 
@@ -208,35 +206,35 @@ get_remote_info(){
 		REMOTE=$1
 	fi
 
-	INFO_REMOTE=$GTEMP/remote.$REMOTE.info.txt
-	if [[ -z "$2" ]] && [[ -s "$INFO_REMOTE" ]] ; then
+	local cache_remote="$cache_folder/remote.$REMOTE.info.txt"
+	if [[ -z "$2" ]] && [[ -s "$cache_remote" ]] ; then
 		# cache exists and no forced update
-		cat $INFO_REMOTE
+		cat "$cache_remote"
 	else
-		GIT_URL=$(list_remotes | egrep "^$REMOTE" | cut -d' ' -f2)
+		GIT_URL=$(list_remotes | grep -E "^$REMOTE" | cut -d' ' -f2)
 		if [[ -n "$GIT_URL" ]] ; then
-			echo "remote : $REMOTE" > $INFO_REMOTE
-			echo "generated : $(date)" >> $INFO_REMOTE
-			echo "git : $GIT_URL" >> $INFO_REMOTE
-			DOMAIN=$(basename $GIT_URL .git)
-			if [[ $DOMAIN == *"."* ]] ; then
+			echo "remote : $REMOTE" > "$cache_remote"
+			echo "generated : $(date)" >> "$cache_remote"
+			echo "git : $GIT_URL" >> "$cache_remote"
+			DOMAIN=$(basename "$GIT_URL" .git)
+			if [[ "$DOMAIN" == *"."* ]] ; then
 				# probably a domain
-				echo "domain : $DOMAIN" >> $INFO_REMOTE
-				IPADR=$(nslookup $DOMAIN 8.8.8.8 | grep -v 8.8.8.8 | grep Address | cut -d: -f2 | sed 's/ //g')
+				echo "domain : $DOMAIN" >> "$cache_remote"
+				IPADR=$(nslookup "$DOMAIN" 8.8.8.8 | grep -v 8.8.8.8 | grep Address | cut -d: -f2 | sed 's/ //g')
 				if [[ -n "$IPADR" ]] ; then
-					echo "IP : $IPADR" >> $INFO_REMOTE
-					REVERSE=$(nslookup $IPADR 8.8.8.8 | grep -v 8.8.8.8 | grep name | cut -d= -f2 | sed 's/ //g')
-					echo "reverse : $REVERSE" >> $INFO_REMOTE
+					echo "IP : $IPADR" >> "$cache_remote"
+					REVERSE=$(nslookup "$IPADR" 8.8.8.8 | grep -v 8.8.8.8 | grep name | cut -d= -f2 | sed 's/ //g')
+					echo "reverse : $REVERSE" >> "$cache_remote"
 				else
 					echo "no IP/nslookup info"
 				fi
-				gandi vhost info $DOMAIN >> $INFO_REMOTE
+				gandi vhost info "$DOMAIN" >> "$cache_remote"
 			else
 				# not a domain
 				echo "[$DOMAIN] is not a domain"
 			fi
 		else
-			echo "Current remotes = " $(list_remotes)
+			echo "Current remotes = $(list_remotes)"
 			die "remote [$REMOTE] not found" 
 		fi
 	fi
@@ -252,17 +250,17 @@ fi
 ## INITIALIZE ALL THE DATA
 
 if [[ "$1" == "init" ]] ; then
-	echo "## $PROGNAME init"
-	add_to_ignore $PROGNAME
-	add_to_ignore $GTEMP
+	echo "## $script_fname init"
+	add_to_ignore "$script_fname"
+	add_to_ignore "$cache_folder"
 	for server in $(list_servers force); do
 		echo "# server $server"
-		get_server_info $server force > /dev/null
-		list_server_domains $server force  > /dev/null
+		get_cache_server "$server" force > /dev/null
+		cache_domains "$server" force  > /dev/null
 	done
 	for remote in $(list_remotes | cut -d' ' -f1); do
 		echo "# remote $remote"
-		get_remote_info $remote force
+		get_remote_info "$remote" force
 	done
 	exit 0
 fi
@@ -272,31 +270,34 @@ if [[ ! -s $LIST_SERVERS ]] ; then
 	exit 0
 fi
 
-DOMAIN=$(get_remote_info $REMOTE | get_value domain)
+DOMAIN=$(get_remote_info "$REMOTE" | get_value domain)
 #echo "#DOMAIN: $DOMAIN"
-WEBHOST=$(get_remote_info $REMOTE | get_value paas_name)
+WEBHOST=$(get_remote_info "$REMOTE" | get_value paas_name)
 if [[ "$WEBHOST" == "" ]] ; then
 	die "WARNING: cannot find the Gandi Paas host for this domain [$DOMAIN] "
 fi
 
-GITHOST=$(get_server_info $WEBHOST | get_value git_server)
-FTPHOST=$(get_server_info $WEBHOST | get_value sftp_server)
-SSHLOGIN=$(get_server_info $WEBHOST | get_value console)
-USERNAME=$(echo $SSHLOGIN | cut -d@ -f1)
-SSHHOST=$(echo $SSHLOGIN | cut -d@ -f2)
+GITHOST=$(get_cache_server "$WEBHOST" | get_value git_server)
+FTPHOST=$(get_cache_server "$WEBHOST" | get_value sftp_server)
+SSHLOGIN=$(get_cache_server "$WEBHOST" | get_value console)
+USERNAME=$(echo "$SSHLOGIN" | cut -d@ -f1)
+#SSHHOST=$(echo "$SSHLOGIN" | cut -d@ -f2)
 #echo "#USER: $USERNAME"
 
 
 git_deploy(){
-	local TOTAL_LINES=$(find . -type f | wc -l | sed 's/ //g')
-	ssh $USERNAME@$GITHOST deploy $DOMAIN.git 2>&1 \
-	| show_progress2 git_deploy $TOTAL_LINES
+	local TOTAL_LINES
+	TOTAL_LINES=$(find . -type f | wc -l | sed 's/ //g')
+	# shellcheck disable=SC2029
+	ssh "$USERNAME@$GITHOST" deploy "$DOMAIN.git" 2>&1 \
+	| show_progress git_deploy "$TOTAL_LINES"
 }
 
 git_push(){
-	local TOTAL_LINES=$(git status | wc -l | sed 's/ //g')
-	git push --verbose $REMOTE master 2>&1 \
-	| show_progress2 git_push $TOTAL_LINES
+	local TOTAL_LINES
+	TOTAL_LINES=$(git status | wc -l | sed 's/ //g')
+	git push --verbose "$REMOTE" master 2>&1 \
+	| show_progress git_push "$TOTAL_LINES"
 }
 
 case "$1" in
@@ -313,27 +314,27 @@ case "$1" in
 	deploy|3)
 		echo "## git deploy -> $FTPHOST ($DOMAIN)"
 		git_deploy
-		echo Check http://$DOMAIN/
+		echo "Check http://$DOMAIN/"
 		;;
 
 	full|all)
 		git commit -a \
 		&& git_push \
 		&& git_deploy
-		echo Check http://$DOMAIN/
+		echo "Check http://$DOMAIN/"
 		;;
 
 	login|ssh)
 		echo "## login as $USERNAME"
 		echo "## get your password from your password manager!"
-		gandi paas console $WEBHOST
+		gandi paas console "$WEBHOST"
 		;;
 
 	serve|8000|http)
 		PORT=8000
 		if [[ -d htdocs ]] ; then
 			echo "## served as http://localhost:$PORT!"
-			php -S localhost:$PORT -t htdocs/
+			php -S "localhost:$PORT" -t htdocs/
 		else
 			echo "!! there is no htdocs folder!"
 			echo "## (maybe you need to do 'ln -s public htdocs')"
@@ -341,7 +342,7 @@ case "$1" in
 		;;
 
 	serve2|random|rnd)
-		PORT=$(( 8000 + $RANDOM % 100 ))
+		PORT=$(( 8000 + RANDOM % 100 ))
 		if [[ -d htdocs ]] ; then
 			echo "## served as http://localhost:$PORT!"
 			## following only works on MacOS
@@ -356,8 +357,8 @@ case "$1" in
 	domains)
 		for server in $(list_servers force); do
 			echo "# server $server"
-			list_server_domains $server \
-			| egrep -v "testmyurl.ws|testing-url.ws" \
+			cache_domains "$server" \
+			| grep -E -v "testmyurl.ws|testing-url.ws" \
 			| awk '{split($0,a,"."); print a[3] a[2] a[1] "     |"  $0}' \
 			| sort \
 			| cut -d'|' -f2
@@ -367,9 +368,9 @@ case "$1" in
 
 	consoles)
 		for server in $(list_servers force); do
-			list_server_domains $server \
-			| egrep -v "testmyurl.ws|testing-url.ws" \
-			| awk -v server=$server '{ printf "%-30s : gandi paas console %s\n", $0, server }'
+			cache_domains "$server" \
+			| grep -E -v "testmyurl.ws|testing-url.ws" \
+			| awk -v server="$server" '{ printf "%-30s : gandi paas console %s\n", $0, server }'
 		done \
 		| sort
 		;;
@@ -383,10 +384,10 @@ case "$1" in
 		;;
 
 	test)
-		ping -c 40 www.google.com | show_progress2 test_ping 29
+		ping -c 40 www.google.com | show_progress test_ping 29
 		;;
 
 	*)
-		die "Unknown $PROGNAME command [$1]"
+		die "Unknown $script_fname command [$1]"
 
 esac
