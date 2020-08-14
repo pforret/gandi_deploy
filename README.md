@@ -9,10 +9,19 @@
 
 ## Installation
 
-* make sure [https://cli.gandi.net/][Gandi CLI] is installed correctly
+### requirements
+
+* make sure [Gandi CLI](https://cli.gandi.net/) is installed correctly
 
 	`gandi account info` (should not give an error)
 
+### easy install
+
+* With [basher](https://github.com/basherpm/basher) package manager
+
+    `basher install pforret/gandi-deploy`
+
+### manual install
 * clone this repository somewhere on your machine
 
 	`git clone https://github.com/pforret/gandi_deploy.git`
@@ -20,6 +29,8 @@
 * from any of your Gandi git-managed project, add a symbolic link to gdeploy.sh
 
 	`ln -s /path/to/gandi_deploy/gdeploy.sh .`
+
+### in any 'deploy with git' www.example.com folder
 
 * run gdeploy.sh init
 
@@ -63,5 +74,3 @@
 
 * **consoles** : get 'gandi paas console ...' command for every site hosted
 
-
-[Gandi CLI]: https://cli.gandi.net/
