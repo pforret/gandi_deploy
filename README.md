@@ -4,22 +4,23 @@
 
 # gandi_deploy
 
+![Gandi Deploy Logo](gandi_deploy.jpg)
 * script to work easily with gandi.net paas git deployment (bash)
-* based on Bash Boilerplate https://github.com/pforret/bash-boilerplate
 
 ## Installation
-
-### requirements
+    
+### prerequisites
 
 * make sure [Gandi CLI](https://cli.gandi.net/) is installed correctly
 
-	`gandi account info` (should not give an error)
+        # test with
+        gandi account info
 
 ### easy install
 
 * With [basher](https://github.com/basherpm/basher) package manager
 
-    `basher install pforret/gandi-deploy`
+        basher install pforret/gandi-deploy
 
 ### manual install
 * clone this repository somewhere on your machine
