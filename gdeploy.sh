@@ -22,16 +22,17 @@ if [[ "$1" == "" ]] ; then
 	echo "# author: $script_author"
 	echo "# website: $script_url"
 	echo "> usage: $script_fname [init|commit|push|deploy|all|login|serve|domains] (target)"
-	echo "  init     : initialize the Gandi Paas settings"
+	echo "  init        : initialize the Gandi Paas settings"
 	echo "  all [remote]: commit, push and deploy this website"
-	echo "  commit   : git commit all local changes"
-	echo "  push [remote]: git push to Gandi git server"
-	echo "  deploy [remote|domain]: ssh deploy from git to live website"
-	echo "  login    : do ssh login to the Gandi host for this website"
-	echo "  serve    : run local devl website on localhost:8000"
-	echo "  rnd      : run local devl website on random port localhost:8000-8099"
-	echo "  consoles : get 'gandi paas console ...' command for every domain"
-	echo "  domains  : get all hosted Gandi sites"
+	echo "  commit      : git commit all local changes"
+	echo "  push [rem]  : git push to Gandi git server"
+	echo "  pull [rem]  : git pull from Gandi git server"
+	echo "  deploy [rem]: ssh deploy from git to live website"
+	echo "  login       : do ssh login to the Gandi host for this website"
+	echo "  serve       : run local devl website on localhost:8000"
+	echo "  rnd         : run local devl website on random port localhost:8000-8099"
+	echo "  consoles    : get 'gandi paas console ...' command for every domain"
+	echo "  domains     : get all hosted Gandi sites"
 	exit 0
 fi
 
@@ -300,6 +301,10 @@ git_push(){
 	| show_progress git_push "$TOTAL_LINES"
 }
 
+git_pull(){
+	git pull "$REMOTE" master
+}
+
 case "$1" in
 	commit|1)
 		echo "## git commit (local)"
@@ -309,6 +314,11 @@ case "$1" in
 	push|2)
 		echo "## git push -> $GITHOST ($REMOTE)"
 		git_push
+		;;
+
+	pull)
+		echo "## git pull <- $GITHOST ($REMOTE)"
+		git_pull
 		;;
 
 	deploy|3)

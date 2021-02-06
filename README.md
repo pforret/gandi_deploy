@@ -4,7 +4,7 @@
 
 # gandi_deploy
 
-![Gandi Deploy Logo](gandi_deploy.jpg)
+![Gandi Deploy Logo](assets/gandi_deploy.jpg)
 * script to work easily with gandi.net paas git deployment (bash)
 
 ## Installation
