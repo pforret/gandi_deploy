@@ -49,29 +49,20 @@
 
 ## Usage 
 
-
-    ./gdeploy.sh [init|commit|push|deploy|all|login|serve|rnd|domains]
-
-* **init** : will get all server/domain/git/remote info for use with the other commands - to update it, just run it again
-
-
-* **commit** : git commit all local changes (will ask for commit text)
-
-* **push [remote]** : git push to Gandi git server (very fast)
-
-* **deploy [remote]** : ssh deploy from git to live website (slow if you have a lot of files or composer packages)
-
-* **all [remote]** : commit, push and deploy this website
-
-
-* **login** : do ssh login to the Gandi host for this website
-
-* **serve** : run local devl website on localhost:8000
-
-* **rnd** : run local devl website on random port localhost:8000-8099, and open it in a browser 
-
-
-* **domains** : list all hosted Gandi sites, per Simple Hosting server
-
-* **consoles** : get 'gandi paas console ...' command for every site hosted
-
+```
+# gdeploy 1.3.0
+# author: Peter Forret <peter@forret.com>
+# website: https://github.com/pforret/gandi_deploy
+> usage: gdeploy [init|commit|push|deploy|all|login|serve|domains] (target)
+init        : initialize the Gandi Paas settings
+all [remote]: commit, push and deploy this website
+commit      : git commit all local changes
+push [rem]  : git push to Gandi git server
+pull [rem]  : git pull from Gandi git server
+deploy [rem]: ssh deploy from git to live website
+login       : do ssh login to the Gandi host for this website
+serve       : run local devl website on localhost:8000
+rnd         : run local devl website on random port localhost:8000-8099
+consoles    : get 'gandi paas console ...' command for every domain
+domains     : get all hosted Gandi sites
+```

@@ -2,11 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="26395b01-cfba-4967-b5cb-26c83d77e2bb" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/gandi_deploy" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gandi_deploy.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/assets/gandi_deploy.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gdeploy.sh" beforeDir="false" afterPath="$PROJECT_DIR$/gdeploy.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -57,7 +53,7 @@
       <updated>1597344704757</updated>
       <workItem from="1597344706060" duration="5465000" />
       <workItem from="1601937335258" duration="399000" />
-      <workItem from="1612616571818" duration="327000" />
+      <workItem from="1612616571818" duration="418000" />
     </task>
     <servers />
   </component>
